@@ -1,0 +1,49 @@
+.weapon-list {
+	margin: 0px;
+	padding: 0px;
+	list-style: none;
+}
+.weapon-list:after {
+	content: "";
+	display: table;
+	clear: both;
+}
+	.weapon-list .weapon {
+		float: left;
+		margin: 5px;
+		padding: 5px;
+		width: 100px;
+		background-color: #eeeeee;
+		border: 1px solid #000000;
+	}
+		.weapon-list .weapon img {
+			width: 100px;
+		}
+		.weapon-list .weapon a {
+			display: block;
+			text-align: center;
+			text-decoration: none;
+		}
+
+.description {
+	float: left;
+	position: relative;
+	margin: 5px;
+	padding: 5px;
+	width: 200px;
+	height: 150px;
+	background-color: #eeeeee;
+	border: 1px solid #000000;
+}
+	.description img {
+		width: 50px;
+	}
+	
+.reroller {
+	position: absolute;
+	top: 5px;
+	right: 10px;
+}
+	.reroller a {
+		text-decoration: none;
+	}
