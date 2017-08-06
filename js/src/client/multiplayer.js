@@ -7,6 +7,7 @@ const CANVAS_HEIGHT = 600;
 
 const POSITIONS_URL = "/positions";
 const MOVE_URL = "/positions/move";
+const UPDATE_FREQUENCY = 10;
 
 function sendPost(method, url, data, callback) {
     var xmlhttp = new XMLHttpRequest();
@@ -77,7 +78,7 @@ var Gamestate = React.createClass({
             sendPost("GET", POSITIONS_URL, undefined, responseText => {
                 window.receiveUpdate(JSON.parse(responseText));
             })
-        }, 100);
+        }, UPDATE_FREQUENCY);
 	},
 	
 	render: function() {

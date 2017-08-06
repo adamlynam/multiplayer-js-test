@@ -6,6 +6,7 @@ const CLIENT_CSS_FILE = './src/server/css/multiplayer.css';
 const CLIENT_JS_FILE = './bin/bundle.js';
 const POSITION_PATH = '/positions';
 const MOVE_PATH = '/positions/move';
+const LONG_POLL_POSITION_PATH = '/wait/positions';
 const CLIENT_CSS_PATH = '/css/multiplayer.css';
 const CLIENT_JS_PATH = '/bundle.js';
 
@@ -22,7 +23,7 @@ module.exports = {
                         id: playerId,
                         x: 0,
                         y: 0,
-                });
+                    });
                 }
                 this.positions.set(playerId, {
                     id: playerId,
@@ -38,6 +39,7 @@ module.exports = {
         var clientCss = fs.readFileSync(CLIENT_CSS_FILE);
         var clientJs = fs.readFileSync(CLIENT_JS_FILE);
         var gameState = this.newGameState();
+        var longPollRequests = [];
         var server = http.createServer(function(request, response) {
             const { headers, method, url } = request;
             var body = [];
@@ -52,16 +54,25 @@ module.exports = {
                     response.end();
                     if (jsonBody.id != undefined && jsonBody.x != undefined && jsonBody.y != undefined)
                     gameState.moveToPosition(jsonBody.id, {x: jsonBody.x, y: jsonBody.y});
+                    var positionUpdate = JSON.stringify(gameState.fetchPositions());
+                    longPollRequests.forEach(response => {
+                        response.writeHead(200, {"Content-Type": "application/json"});
+                        response.write(positionUpdate);
+                        response.end();
+                    });
                 }
                 else if (url.startsWith(POSITION_PATH)) {
                     response.writeHead(200, {"Content-Type": "application/json"});
                     response.write(JSON.stringify(gameState.fetchPositions()));
                     response.end();    
                 }
+                else if (url.startsWith(LONG_POLL_POSITION_PATH)) {
+                    longPollRequests.push(response);
+                }
                 else if (url.startsWith(CLIENT_CSS_PATH)) {
                     response.writeHead(200, {"Content-Type": "application/css"});
                     response.write(clientCss);
-                    response.end();    
+                    response.end();
                 }
                 else if (url.startsWith(CLIENT_JS_PATH)) {
                     response.writeHead(200, {"Content-Type": "application/js"});
