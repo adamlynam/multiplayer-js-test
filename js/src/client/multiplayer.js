@@ -4,10 +4,12 @@ const ReactDOM = require('react-dom');
 const CIRCLE_RADIUS = 10;
 const CANVAS_WIDTH = 600;
 const CANVAS_HEIGHT = 600;
+// 30 seconds because we want long polling to behave itself
+const HTTP_TIMEOUT = 30000;
 
 const POSITIONS_URL = "/positions";
 const MOVE_URL = "/positions/move";
-const UPDATE_FREQUENCY = 10;
+const LONG_POLL_POSITIONS_URL = "/wait/positions";
 
 function sendPost(method, url, data, callback) {
     var xmlhttp = new XMLHttpRequest();
@@ -18,9 +20,11 @@ function sendPost(method, url, data, callback) {
             }
             else {
                 console.error(xmlhttp);
+                callback(undefined);
             }
         }
     };
+    xmlhttp.timeout = HTTP_TIMEOUT;
     xmlhttp.open(method, url, true);
     if (data == undefined) {
         xmlhttp.send();
@@ -74,11 +78,18 @@ var Gamestate = React.createClass({
 		window.receiveUpdate = newPositions => {
             this.updatePositions(newPositions);
 		};
-        setInterval(() => {
-            sendPost("GET", POSITIONS_URL, undefined, responseText => {
-                window.receiveUpdate(JSON.parse(responseText));
-            })
-        }, UPDATE_FREQUENCY);
+        var longPollUpdate = () => {
+            sendPost("GET", LONG_POLL_POSITIONS_URL, undefined, responseText => {
+                longPollUpdate();
+                if (responseText != undefined) {
+                    window.receiveUpdate(JSON.parse(responseText));
+                }
+            });
+        };
+        sendPost("GET", POSITIONS_URL, undefined, responseText => {
+            window.receiveUpdate(JSON.parse(responseText));
+            longPollUpdate();
+        });
 	},
 	
 	render: function() {

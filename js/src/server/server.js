@@ -52,14 +52,18 @@ module.exports = {
                     var jsonBody = JSON.parse(Buffer.concat(body).toString());
                     response.writeHead(200, {"Content-Type": "application/json"});
                     response.end();
-                    if (jsonBody.id != undefined && jsonBody.x != undefined && jsonBody.y != undefined)
-                    gameState.moveToPosition(jsonBody.id, {x: jsonBody.x, y: jsonBody.y});
-                    var positionUpdate = JSON.stringify(gameState.fetchPositions());
-                    longPollRequests.forEach(response => {
-                        response.writeHead(200, {"Content-Type": "application/json"});
-                        response.write(positionUpdate);
-                        response.end();
-                    });
+                    if (jsonBody.id != undefined && jsonBody.x != undefined && jsonBody.y != undefined) {
+                        gameState.moveToPosition(jsonBody.id, {x: jsonBody.x, y: jsonBody.y});
+                        var positionUpdate = JSON.stringify(gameState.fetchPositions());
+                        longPollRequests.forEach(response => {
+                            longPollRequests.pop(response);
+                            if (!response.finished) {
+                                response.writeHead(200, {"Content-Type": "application/json"});
+                                response.write(positionUpdate);
+                                response.end();
+                            }
+                        });
+                    }
                 }
                 else if (url.startsWith(POSITION_PATH)) {
                     response.writeHead(200, {"Content-Type": "application/json"});
