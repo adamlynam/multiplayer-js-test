@@ -4,6 +4,7 @@ const ReactDOM = require('react-dom');
 const CIRCLE_RADIUS = 10;
 const CANVAS_WIDTH = 600;
 const CANVAS_HEIGHT = 600;
+const MOVE_SPEED = 10;
 // 30 seconds because we want long polling to behave itself
 const HTTP_TIMEOUT = 30000;
 
@@ -35,12 +36,28 @@ function sendPost(method, url, data, callback) {
     }
 }
 
+function calculateNewPosition(currentPosition, targetPosition) {
+    var newX = currentPosition.x;
+    var newY = currentPosition.y;
+    if (currentPosition.x > targetPosition.x) {
+        newX = currentPosition.x - Math.min(currentPosition.x - targetPosition.x, MOVE_SPEED);
+    } else if (currentPosition.x < targetPosition.x) {
+        newX = currentPosition.x + Math.min(targetPosition.x - currentPosition.x, MOVE_SPEED);
+    }
+    if (currentPosition.y > targetPosition.y) {
+        newY = currentPosition.y - Math.min(currentPosition.y - targetPosition.y, MOVE_SPEED);
+    } else if (currentPosition.y < targetPosition.y) {
+        newY = currentPosition.y + Math.min(targetPosition.y - currentPosition.y, MOVE_SPEED);
+    }
+    return {x: newX, y: newY};
+}
+
 var Playarea = React.createClass({
 	componentDidUpdate: function(prevProps, prevState) {
 		var context = this.canvasRef.getContext('2d');
         // clear
         context.clearRect(0, 0, this.canvasRef.width, this.canvasRef.height);
-		this.props.positions.forEach(position => {
+		this.props.positions.forEach((position, id) => {
 			context.beginPath();
 			context.arc(position.x, position.y, CIRCLE_RADIUS, 0, 2 * Math.PI, false);
 			context.fillStyle = 'green';
@@ -66,7 +83,8 @@ var Gamestate = React.createClass({
 	getInitialState: function() {
 		return {
             id: undefined,
-			positions: [],
+			positions: new Map(),
+            animations: new Map(),
 		};
 	},
     setId: function(newId) {
@@ -83,12 +101,40 @@ var Gamestate = React.createClass({
             };
         });
     },
+    updateAnimations: function(newTargetPositions) {
+        var updatedAnimations = new Map();
+		newTargetPositions.forEach(targetPosition => {
+            updatedAnimations.set(targetPosition.id, {x: targetPosition.x, y: targetPosition.y});
+        });
+        this.setState((previousState, currentProps) => {
+            return {
+                animations: updatedAnimations,
+            };
+        });
+    },
+    tickAnimations: function() {
+        var updatedPositions = new Map(this.state.positions);
+		this.state.animations.forEach((targetPosition, id) => {
+            if (this.state.positions.has(id)) {
+                var currentPosition = this.state.positions.get(id);
+                if (currentPosition.x != targetPosition.x || currentPosition.y != targetPosition.y) {
+                    // moving, animation update required
+                    updatedPositions.set(id, calculateNewPosition(currentPosition, targetPosition));
+                }
+            }
+            else {
+                updatedPositions.set(id, targetPosition);
+            }
+        });
+        this.updatePositions(updatedPositions);
+    },
 	componentWillMount: function() {
+        setInterval(this.tickAnimations, 10);
 		window.setId = newId => {
             this.setId(newId);
 		};
-		window.receiveUpdate = newPositions => {
-            this.updatePositions(newPositions);
+		window.receiveUpdate = newTargetPositions => {
+            this.updateAnimations(newTargetPositions);
 		};
         sendPost("GET", REGISTER_URL, undefined, responseText => {
             window.setId(JSON.parse(responseText));
