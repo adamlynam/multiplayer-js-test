@@ -1,9 +1,11 @@
 const http = require("http");
 const fs = require('fs');
+const crypto = require("crypto");
 
 const CLIENT_HTML_FILE = './src/server/demo.html';
 const CLIENT_CSS_FILE = './src/server/css/multiplayer.css';
 const CLIENT_JS_FILE = './bin/bundle.js';
+const REGISTER_PATH = '/register';
 const POSITION_PATH = '/positions';
 const MOVE_PATH = '/positions/move';
 const LONG_POLL_POSITION_PATH = '/wait/positions';
@@ -14,6 +16,9 @@ module.exports = {
     newGameState: function () {
         return {
             positions: new Map(),
+            issueId: function() {
+                return crypto.randomBytes(16).toString("hex");
+            },
             fetchPositions: function() {
                 return [...this.positions.values()];
             },
@@ -55,8 +60,9 @@ module.exports = {
                     if (jsonBody.id != undefined && jsonBody.x != undefined && jsonBody.y != undefined) {
                         gameState.moveToPosition(jsonBody.id, {x: jsonBody.x, y: jsonBody.y});
                         var positionUpdate = JSON.stringify(gameState.fetchPositions());
-                        longPollRequests.forEach(response => {
-                            longPollRequests.pop(response);
+                        var requests = [...longPollRequests];
+                        longPollRequests = [];
+                        requests.forEach(response => {
                             if (!response.finished) {
                                 response.writeHead(200, {"Content-Type": "application/json"});
                                 response.write(positionUpdate);
@@ -64,6 +70,11 @@ module.exports = {
                             }
                         });
                     }
+                }
+                else if (url.startsWith(REGISTER_PATH)) {
+                    response.writeHead(200, {"Content-Type": "application/json"});
+                    response.write(JSON.stringify(gameState.issueId()));
+                    response.end();
                 }
                 else if (url.startsWith(POSITION_PATH)) {
                     response.writeHead(200, {"Content-Type": "application/json"});

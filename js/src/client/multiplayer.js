@@ -7,6 +7,7 @@ const CANVAS_HEIGHT = 600;
 // 30 seconds because we want long polling to behave itself
 const HTTP_TIMEOUT = 30000;
 
+const REGISTER_URL = "/register";
 const POSITIONS_URL = "/positions";
 const MOVE_URL = "/positions/move";
 const LONG_POLL_POSITIONS_URL = "/wait/positions";
@@ -51,22 +52,30 @@ var Playarea = React.createClass({
 	},
 	move: function(event) {
         var rect = this.canvasRef.getBoundingClientRect();
-        sendPost("POST", MOVE_URL, JSON.stringify({id: 1, x: event.clientX - rect.left, y: event.clientY - rect.top}), responseText => {
+        sendPost("POST", MOVE_URL, JSON.stringify({id: this.props.id, x: event.clientX - rect.left, y: event.clientY - rect.top}), responseText => {
             // nothing to do here
         });
 	},
 	
 	render: function() {
-		return <canvas width={CANVAS_WIDTH} height={CANVAS_HEIGHT} onClick={this.move} ref={ref => this.canvasRef = ref} />;
+		return <canvas width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{border: '1px solid #333333'}} onClick={this.move} ref={ref => this.canvasRef = ref} />;
 	}
 });
 
 var Gamestate = React.createClass({
 	getInitialState: function() {
 		return {
+            id: undefined,
 			positions: [],
 		};
 	},
+    setId: function(newId) {
+        this.setState((previousState, currentProps) => {
+            return {
+                id: newId,
+            };
+        });
+    },
     updatePositions: function(newPositions) {
         this.setState((previousState, currentProps) => {
             return {
@@ -75,25 +84,31 @@ var Gamestate = React.createClass({
         });
     },
 	componentWillMount: function() {
+		window.setId = newId => {
+            this.setId(newId);
+		};
 		window.receiveUpdate = newPositions => {
             this.updatePositions(newPositions);
 		};
-        var longPollUpdate = () => {
-            sendPost("GET", LONG_POLL_POSITIONS_URL, undefined, responseText => {
+        sendPost("GET", REGISTER_URL, undefined, responseText => {
+            window.setId(JSON.parse(responseText));
+            var longPollUpdate = () => {
+                sendPost("GET", LONG_POLL_POSITIONS_URL, undefined, responseText => {
+                    longPollUpdate();
+                    if (responseText != undefined) {
+                        window.receiveUpdate(JSON.parse(responseText));
+                    }
+                });
+            };
+            sendPost("GET", POSITIONS_URL, undefined, responseText => {
+                window.receiveUpdate(JSON.parse(responseText));
                 longPollUpdate();
-                if (responseText != undefined) {
-                    window.receiveUpdate(JSON.parse(responseText));
-                }
             });
-        };
-        sendPost("GET", POSITIONS_URL, undefined, responseText => {
-            window.receiveUpdate(JSON.parse(responseText));
-            longPollUpdate();
         });
 	},
 	
 	render: function() {
-		return <Playarea positions={this.state.positions} receiveUpdate={this.receiveUpdate} />;
+		return <Playarea id={this.state.id} positions={this.state.positions} receiveUpdate={this.receiveUpdate} />;
 	}
 });
 
